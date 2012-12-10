@@ -158,7 +158,6 @@ window.onload = function(){
         $(selector).replace(this.$el);
     };
 
-    new window.Slider().append('.main');
+    new window.Slider({hardmin:true}).append('.main');
     new window.Slider({showProgress:false}).append('.main');
-    new window.Slider({showIncrement:false}).append('.main');
 }

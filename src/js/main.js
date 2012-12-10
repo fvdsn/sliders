@@ -1,6 +1,7 @@
 window.onload = function(){
     window.slider_template = 
         "<span class='slider'> \
+            <span class='preset'></span>\
             <span class='progress'>\
                 <span class='indicator'>\
 				</span>\
@@ -23,6 +24,8 @@ window.onload = function(){
         this.initialmax = 1;
         this.hardmax = false;
         this.autoresize = true;
+        this.linear = false;
+        this.label = "";
 
         this.decimals  = 3;
         this.precision = 0.01;
@@ -35,6 +38,13 @@ window.onload = function(){
 
         this.showProgress = true;
         this.showIncrement = true;
+
+        this.presets = {
+            'min':this.min,
+            'middle': (this.min+this.max)/2.0,
+            'max':this.max,
+        }
+        this.sortedPresets = null;
 
         for(field in this){
             if(this.hasOwnProperty(field) && opt.hasOwnProperty(field)){
@@ -50,11 +60,17 @@ window.onload = function(){
         });
         this.$el.find('.slide').bind('dragend',function(ev,drag){
             self.setBounds();
+            self.$el.find('.preset').hide(250);
         });
         this.$el.find('.slide').bind('drag',function(ev,drag){ 
             var dx = drag.deltaX - self.lastX;
             self.lastX = drag.deltaX;
             self.setValue( self.slide(self.startValue, self.value, dx, drag.deltaX, {precise:ev.shiftKey, step:ev.ctrlKey}));
+            if(ev.altKey){
+                self.$el.find('.preset').show();
+            }else{
+                self.$el.find('.preset').hide(250);
+            }
         });
         if(!this.showProgress){
             this.$el.find('.progress').remove();
@@ -62,6 +78,7 @@ window.onload = function(){
         if(!this.showIncrement){
             this.$el.find('.arrow').remove();
         }
+        this.$el.find('.preset').hide();
 
         this.render();
     };
@@ -74,16 +91,24 @@ window.onload = function(){
         return Math.pow(base,power);
     }
     proto.getPrecision = function(value){
-        return Math.max( powround( typeof value === 'undefined' ? this.value: value ) * this.precision, this.maxprecision);
+        if(this.linear){
+            return this.precision;
+        }else{
+            return Math.max( powround( typeof value === 'undefined' ? this.value: value ) * this.precision, this.maxprecision);
+        }
     };
     proto.getStep = function(value){
-        return Math.max( powround( typeof value === 'undefined' ? this.value: value ) * this.step, this.minstep);
+        if(this.linear){
+            return this.step;
+        }else{
+            return Math.max( powround( typeof value === 'undefined' ? this.value: value ) * this.step, this.minstep);
+        }
     };
     proto.decrease = function(){
-        this.setValue(this.value - this.increment);
+        this.setValue(this.value - this.getPrecision(this.value));
     };
     proto.increase = function(){
-        this.setValue(this.value + this.increment);
+        this.setValue(this.value + this.getPrecision(this.value));
     };
     proto.slide = function(startval,currval,disp,totaldisp,opts){
         if(opts.step){
@@ -142,7 +167,7 @@ window.onload = function(){
         if(this.value === 0){
             decimals = this.decimals;
         }
-        this.$el.find('.value').html(this.value.toFixed(decimals));
+        this.$el.find('.value').html((this.label ? '<b>'+this.label + '</b>' : '')+this.value.toFixed(decimals));
         if(true || this.value >= 0){
             var pc = Math.round( 100 * (this.value - this.min) / (this.max - this.min) );
             this.$el.find('.progress .indicator').css({'left':0,'right':'auto','width':''+pc+'%'});
@@ -159,5 +184,6 @@ window.onload = function(){
     };
 
     new window.Slider({hardmin:true}).append('.main');
-    new window.Slider({showProgress:false}).append('.main');
+    new window.Slider({showProgress:false,label:'foobar'}).append('.main');
+    new window.Slider({showProgress:false,linear:true,label:'linear'}).append('.main');
 }

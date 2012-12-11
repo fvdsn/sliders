@@ -7,6 +7,7 @@ body, html{
 	margin:  0px;
 	color: #black;
 }
+
 .main{
 	display: block;
 	width: 600px;
@@ -18,7 +19,7 @@ body, html{
 .slider{
 	display: block;
 	height: 20px;
-	background: gray;
+	background: #A8A8A8;
 	position: relative;
 	border-radius: 4px;
 	margin:4px;
@@ -27,7 +28,7 @@ body, html{
 	-webkit-user-select: none;
 }
 .slider:hover {
-	background: #868686;
+	background: #BBB;
 }
 .slider .progress{
 	position: absolute;
@@ -51,7 +52,7 @@ body, html{
 .slider .progress .indicator{
 	position: absolute;
 	left:0; top: 0; bottom: 0; width:75%;
-	background: #555;
+	background: #888;
 	border-radius: 2px;
 	cursor: pointer;
 }
@@ -112,6 +113,7 @@ body, html{
 	height: 400px;
 	background: #242424;
 	border-radius: 2px;
+	box-shadow: 0px 5px 20px rgba(0,0,0,0.2);
 }
 .view .controls{
 	position: absolute;
@@ -121,6 +123,8 @@ body, html{
 	bottom:0px;
 	background: rgba(0,0,0,0.5);
 	text-align: center;
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
 	padding: 4px;
 	opacity:0;
 	-webkit-transition: all 250ms linear;
@@ -132,6 +136,7 @@ body, html{
 .view canvas{
 	width:100%;
 	height:100%;
+	border-radius: 2px;
 }
 .view:hover .controls{
 	opacity:1;

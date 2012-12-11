@@ -26,6 +26,7 @@ window.onload = function(){
         this.autoresize = true;
         this.linear = false;
         this.label = "";
+        this.set_value = null;
 
         this.decimals  = 3;
         this.precision = 0.01;
@@ -158,13 +159,16 @@ window.onload = function(){
         }
 
         this.value = val;
+        if(this.set_value){
+            this.set_value(val);
+        }
         this.render();
     };
 
     proto.render = function(){
         var power = Math.max(-14,Math.round(Math.log(Math.abs(this.value))/Math.log(10)));
         var decimals = Math.max(this.decimals,this.decimals-power);
-        if(this.value === 0){
+        if(this.value === 0 || this.linear){
             decimals = this.decimals;
         }
         this.$el.find('.value').html((this.label ? '<b>'+this.label + '</b>' : '')+this.value.toFixed(decimals));
@@ -182,8 +186,104 @@ window.onload = function(){
     proto.replace = function(selector){
         $(selector).replace(this.$el);
     };
+    
+    /* ---------------- float image buffers --------------- */
 
-    new window.Slider({hardmin:true}).append('.main');
-    new window.Slider({showProgress:false,label:'foobar'}).append('.main');
-    new window.Slider({showProgress:false,linear:true,label:'linear'}).append('.main');
+    function Buffer(opts){
+        opts = opts || {};
+        this.width = opts.width || 100;
+        this.height = opts.height || 100;
+        this.channels = 3;
+        this.pxcount = this.width * this.height * this.channels; 
+        this.data   = new Float32Array(this.pxcount);
+        this.gamma = 2.2;
+        if(opts.imgsrc){
+            this.readImage(opts.imgsrc);
+        }
+    }
+    window.Buffer = Buffer;
+    var proto = Buffer.prototype;
+
+    proto.add = function(buffer){
+        for(var i = 0; i < this.pxcount; i++){
+            this.data[i] += buffer.data[i];
+        }
+    };
+    proto.mult = function(val){
+        for(var i = 0; i < this.pxcount; i++){
+            this.data[i] *= val;
+        }
+    };
+    proto.set = function(val){
+        if(val instanceof Buffer){
+            for(var i = 0; i < this.pxcount; i++){
+                this.data[i] = val.data[i];
+            }
+        }else{
+            for(var i = 0; i < this.pxcount; i++){
+                this.data[i] = val;
+            }
+        }
+    };
+    proto.renderToCanvas = function(selector){
+        var canvas = $(selector)[0];
+        if(canvas){
+            canvas.width = this.width;
+            canvas.height = this.height;
+            var ctx = canvas.getContext('2d');
+            var img = ctx.createImageData(this.width,this.height);
+            var px = img.data;
+            var chan = this.channels;
+            var gamma = this.gamma;
+            var pxcount = this.width * this.height;
+            for(var i = 0; i < pxcount; i++){
+                px[i*4]   = Math.round(Math.pow(this.data[i*chan],  gamma)*255);
+                px[i*4+1] = Math.round(Math.pow(this.data[i*chan+1],gamma)*255);
+                px[i*4+2] = Math.round(Math.pow(this.data[i*chan+2],gamma)*255);
+                px[i*4+3] = 255;
+            }
+            ctx.putImageData(img,0,0);
+        }
+    };
+    proto.readImage = function(path){
+        var self = this;
+        var img = new Image();
+        img.src = path;
+        img.onload = function(){
+            var canvas = document.createElement('canvas');
+            canvas.width = self.width;
+            canvas.height = self.height;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(img,0,0);
+            imgd = ctx.getImageData(0,0,self.width,self.height);
+            var px = imgd.data;
+            var gamma = 1.0/self.gamma;
+            var pxcount = self.width * self.height;
+            for(var i = 0; i < pxcount; i++){
+                self.data[i*3]   = Math.pow(px[i*4]/255.0,  gamma);
+                self.data[i*3+1] = Math.pow(px[i*4+1]/255.0,  gamma);
+                self.data[i*3+2] = Math.pow(px[i*4+2]/255.0,  gamma);
+            }
+            console.log('image loaded');
+        };
+    };
+            
+
+    var a = new Buffer({width:800,height:600,imgsrc:'img/a.jpg'});
+    var b = new Buffer({width:800,height:600,imgsrc:'img/b.jpg'});
+    var tmp = new Buffer({width:800,height:600});
+    var c = new Buffer({width:800,height:600});
+    window.slide = function(fac){
+        tmp.set(a);
+        tmp.mult(fac);
+        c.set(tmp);
+        tmp.set(b);
+        tmp.mult(1-fac);
+        c.add(tmp);
+        c.renderToCanvas('canvas');
+    }
+
+    window.slider = new Slider({label:'factor',hardmin:true, hardmax:true, linear:true, set_value:slide});
+    slider.append('.view.blending .controls');
+    setTimeout(function(){slider.setValue(0.5);},1000);
 }

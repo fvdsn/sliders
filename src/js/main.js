@@ -237,10 +237,17 @@ window.onload = function(){
             var gamma = 1.0/this.gamma;
             var pxcount = this.width * this.height;
             for(var i = 0; i < pxcount; i++){
+                px[i*4]   = Math.sqrt(this.data[i*chan]) *255;
+                px[i*4+1] = Math.sqrt(this.data[i*chan+1])*255;
+                px[i*4+2] = Math.sqrt(this.data[i*chan+2])*255;
+                px[i*4+3] = 255;
+                /*
+                 // THIS IS MASSIVELY SLOWER WTF POW ?
                 px[i*4]   = Math.round(Math.pow(this.data[i*chan],  gamma)*255);
                 px[i*4+1] = Math.round(Math.pow(this.data[i*chan+1],gamma)*255);
                 px[i*4+2] = Math.round(Math.pow(this.data[i*chan+2],gamma)*255);
                 px[i*4+3] = 255;
+                */
             }
             ctx.putImageData(img,0,0);
         }
@@ -269,21 +276,50 @@ window.onload = function(){
     };
             
 
-    var a = new Buffer({width:800,height:600,imgsrc:'img/RED-disto.png'});
-    var b = new Buffer({width:800,height:600,imgsrc:'img/BLUE-disto.png'});
+    var r = new Buffer({width:800,height:600,imgsrc:'img/RED.png'});
+    var b = new Buffer({width:800,height:600,imgsrc:'img/BLUE.png'});
+    var g = new Buffer({width:800,height:600,imgsrc:'img/GREEN.png'});
     var tmp = new Buffer({width:800,height:600});
-    var c = new Buffer({width:800,height:600});
+    var d = new Buffer({width:800,height:600});
     window.slide = function(fac){
-        tmp.set(a);
-        tmp.mult(fac);
-        c.set(tmp);
+        var fr = 0, fg = 0, fb = 0;
+        if(fac < 1.0/6.0){
+            fr = 1.0;
+            fg = fac * 6.0;
+        }else if(fac < 2.0/6.0){
+            fg = 1.0;
+            fr = 1-((fac - 1.0/6.0)*6.0);
+        }else if(fac < 3.0/6.0){
+            fg = 1.0;
+            fb = (fac -2.0/6.0) * 6.0;
+        }else if(fac < 4.0/6.0){
+            fg = 1-((fac - 3.0/6.0)*6.0);
+            fb = 1.0;
+        }else if(fac < 5.0/6.0){
+            fb = 1.0;
+            fr = (fac - 4.0/6.0) * 6.0;
+        }else{
+            fr = 1.0;
+            fb = 1-((fac - 5.0/6.0)*6.0);
+        }
+        var norm = 1.0/Math.sqrt(fr*fr + fg*fg + fb*fb);
+        fr *= norm;
+        fg *= norm;
+        fb *= norm;
+
+        tmp.set(r);
+        tmp.mult(fr);
+        d.set(tmp);
+        tmp.set(g);
+        tmp.mult(fg);
+        d.add(tmp);
         tmp.set(b);
-        tmp.mult(1-fac);
-        c.add(tmp);
-        c.renderToCanvas('canvas');
+        tmp.mult(fb);
+        d.add(tmp);
+        d.renderToCanvas('canvas');
     }
 
-    window.slider = new Slider({label:'factor',hardmin:true, hardmax:true, linear:true, set_value:slide});
+    window.slider = new Slider({label:'hue',hardmin:true, hardmax:true, linear:true, set_value:slide});
     slider.append('.view.blending .controls');
     setTimeout(function(){slider.setValue(0.5);},1000);
 }

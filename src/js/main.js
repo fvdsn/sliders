@@ -196,7 +196,7 @@ window.onload = function(){
         this.channels = 3;
         this.pxcount = this.width * this.height * this.channels; 
         this.data   = new Float32Array(this.pxcount);
-        this.gamma = 2.2;
+        this.gamma = 2.0;
         if(opts.imgsrc){
             this.readImage(opts.imgsrc);
         }
@@ -234,7 +234,7 @@ window.onload = function(){
             var img = ctx.createImageData(this.width,this.height);
             var px = img.data;
             var chan = this.channels;
-            var gamma = this.gamma;
+            var gamma = 1.0/this.gamma;
             var pxcount = this.width * this.height;
             for(var i = 0; i < pxcount; i++){
                 px[i*4]   = Math.round(Math.pow(this.data[i*chan],  gamma)*255);
@@ -257,7 +257,7 @@ window.onload = function(){
             ctx.drawImage(img,0,0);
             imgd = ctx.getImageData(0,0,self.width,self.height);
             var px = imgd.data;
-            var gamma = 1.0/self.gamma;
+            var gamma = self.gamma;
             var pxcount = self.width * self.height;
             for(var i = 0; i < pxcount; i++){
                 self.data[i*3]   = Math.pow(px[i*4]/255.0,  gamma);
@@ -269,8 +269,8 @@ window.onload = function(){
     };
             
 
-    var a = new Buffer({width:800,height:600,imgsrc:'img/a.jpg'});
-    var b = new Buffer({width:800,height:600,imgsrc:'img/b.jpg'});
+    var a = new Buffer({width:800,height:600,imgsrc:'img/RED-disto.png'});
+    var b = new Buffer({width:800,height:600,imgsrc:'img/BLUE-disto.png'});
     var tmp = new Buffer({width:800,height:600});
     var c = new Buffer({width:800,height:600});
     window.slide = function(fac){

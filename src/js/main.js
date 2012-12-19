@@ -210,8 +210,16 @@ window.onload = function(){
         }
     };
     proto.mult = function(val){
-        for(var i = 0; i < this.pxcount; i++){
-            this.data[i] *= val;
+        if(typeof val === 'number'){
+            for(var i = 0; i < this.pxcount; i++){
+                this.data[i] *= val;
+            }
+        }else if(val instanceof Array){
+            for(var i = 0, len = this.width * this.height; i < len; i++){
+                this.data[i*3]   *= val[0];
+                this.data[i*3+1] *= val[1];
+                this.data[i*3+2] *= val[2];
+            }
         }
     };
     proto.set = function(val){
@@ -267,9 +275,10 @@ window.onload = function(){
             var gamma = self.gamma;
             var pxcount = self.width * self.height;
             for(var i = 0; i < pxcount; i++){
-                self.data[i*3]   = Math.pow(px[i*4]/255.0,  gamma);
-                self.data[i*3+1] = Math.pow(px[i*4+1]/255.0,  gamma);
-                self.data[i*3+2] = Math.pow(px[i*4+2]/255.0,  gamma);
+                var rnd = Math.random()/255.0;
+                self.data[i*3]   = Math.pow(px[i*4]/255.0+rnd ,  gamma);
+                self.data[i*3+1] = Math.pow(px[i*4+1]/255.0+rnd,  gamma);
+                self.data[i*3+2] = Math.pow(px[i*4+2]/255.0+rnd,  gamma);
             }
             console.log('image loaded');
         };
@@ -316,10 +325,72 @@ window.onload = function(){
         tmp.set(b);
         tmp.mult(fb);
         d.add(tmp);
-        d.renderToCanvas('canvas');
+        d.renderToCanvas('canvas.blend');
     }
 
     window.slider = new Slider({label:'hue',hardmin:true, hardmax:true, linear:true, set_value:slide});
     slider.append('.view.blending .controls');
     setTimeout(function(){slider.setValue(0.5);},1000);
+
+    var ceil = new Buffer({width:800,height:600,imgsrc:'img/LIGHTINGCEILING.png'});
+    var balls = new Buffer({width:800,height:600,imgsrc:'img/LIGHTINGBALLSDIM.png'});
+    var blocks = new Buffer({width:800,height:600,imgsrc:'img/LIGHTINGBLOCKS.png'});
+    var lights = new Buffer({width:800,height:600});
+    
+    var ceil_intensity = 7;
+    var ceil_color = [0,0.26,1];
+    var balls_intensity = 75;
+    var balls_color = [1,0.07,0];
+    var blocks_intensity = 0.3;
+    var blocks_color = [0,0,1];
+
+    function renderLight(){
+        tmp.set(ceil);
+        tmp.mult(ceil_intensity);
+        tmp.mult(ceil_color);
+        lights.set(tmp);
+        tmp.set(balls);
+        tmp.mult(balls_intensity/10.0);
+        tmp.mult(balls_color);
+        lights.add(tmp);
+        tmp.set(blocks);
+        tmp.mult(blocks_intensity);
+        tmp.mult(blocks_color);
+        lights.add(tmp);
+        lights.renderToCanvas('canvas.lights');
+    }
+    function new_color_slider(label,color,selector){
+        (new Slider({label:label+' R',hardmin:true,hardmax:true, value:color[0], set_value:function(val){
+            color[0] = val;
+            renderLight();
+        }})).append(selector);
+        (new Slider({label:label+' G',hardmin:true,hardmax:true, value:color[1], set_value:function(val){
+            color[1] = val;
+            renderLight();
+        }})).append(selector);
+        (new Slider({label:label+' B',hardmin:true,hardmax:true, value:color[2], set_value:function(val){
+            color[2] = val;
+            renderLight();
+        }})).append(selector);
+        
+    }
+    
+    new_color_slider('Ceiling',ceil_color,'.view.lights .controls .group.left');
+    (new Slider({label:'Ceiling',hardmin:true, showProgress:false, value:ceil_intensity, set_value:function(val){
+        ceil_intensity = val;
+        renderLight();
+    }})).append('.view.lights .controls .group.left');
+
+    new_color_slider('Balls',  balls_color,'.view.lights .controls .group.center');
+    (new Slider({label:'Balls',hardmin:true, showProgress:false, value:balls_intensity, set_value:function(val){
+        balls_intensity = val;
+        renderLight();
+    }})).append('.view.lights .controls .group.center');
+
+    new_color_slider('Blocks', blocks_color,'.view.lights .controls .group.right');
+    (new Slider({label:'Blocks',hardmin:true, showProgress:false, value:blocks_intensity, set_value:function(val){
+        blocks_intensity = val;
+        renderLight();
+    }})).append('.view.lights .controls .group.right');
+    setTimeout(function(){renderLight();},1000);
 }

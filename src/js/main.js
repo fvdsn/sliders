@@ -327,9 +327,10 @@ window.onload = function(){
     proto.sample = function(sample,buffer,variance,maxsample){
         variance = typeof variance === 'undefined' ? 1 : variance;
         maxsample = maxsample || sample;
+        var fac = Math.min(1,1/Math.sqrt(sample*0.3));
         function gather(value){
             if(value > 0.001){
-                return (Math.random() - 0.5)*(1-sample/maxsample) + value;
+                return (Math.random() - 0.5)*fac + value;
             }else{
                 return value;
             }

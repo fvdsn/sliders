@@ -27,6 +27,7 @@ window.onload = function(){
         this.linear = false;
         this.label = "";
         this.set_value = null;
+        this.looping = false;
 
         this.decimals  = 3;
         this.precision = 0.01;
@@ -36,6 +37,7 @@ window.onload = function(){
         this.minstep = 0.05;
         this.value = 0.75;
         this.increment = 0.1;
+        
 
         this.showProgress = true;
         this.showIncrement = true;
@@ -86,6 +88,15 @@ window.onload = function(){
     var proto = window.Slider.prototype;
 
 
+    proto.sortPresets = function(){
+        this.sortedPresets = [];
+        for(preset in this.presets){
+            this.sortedPresets.append(preset);
+        }
+        this.sortedPresets.sort(function(a,b){ return a.value - b.value; });
+    }
+    proto.nearestPreset = function(value){
+    }
     function powround(value,base){
         base = typeof base === 'undefined' ? 10 : base;
         var power = Math.max(-14,Math.round(Math.log(Math.abs(value))/Math.log(base)));
@@ -144,6 +155,14 @@ window.onload = function(){
     }
 
     proto.setValue = function(val){
+        if(this.looping){
+            while(val > this.max){
+                val -= (this.max - this.min);
+            }
+            while(val < this.min){
+                val += (this.max - this.min);
+            }
+        }
         if(val > this.max){
             if(this.hardmax){
                 val = this.max;
@@ -195,7 +214,8 @@ window.onload = function(){
         this.height = opts.height || 100;
         this.channels = 3;
         this.pxcount = this.width * this.height * this.channels; 
-        this.data   = new Float32Array(this.pxcount);
+        this.datalen = this.width * this.height * this.channels;
+        this.data   = new Float32Array(this.datalen);
         this.gamma = 2.0;
         if(opts.imgsrc){
             this.readImage(opts.imgsrc);
@@ -209,6 +229,148 @@ window.onload = function(){
             this.data[i] += buffer.data[i];
         }
     };
+    proto.addScaled = function(buffer,scale){
+        for(var i = 0; i < this.pxcount; i++){
+            this.data[i] += buffer.data[i] * scale;
+        }
+    };
+
+    proto.normalize = function(){
+        var pxcount = this.width * this.height;
+        var px = this.data;
+        var zero = 1/Math.sqrt(3);
+        for(var i = 0; i < pxcount; i++){
+            var x = i*3;
+            var len = Math.sqrt(px[x]*px[x] + px[x+1]*px[x+1] + px[x+2]*px[x+2]);
+            if(len === 0){
+                px[x] = zero;
+                px[x+1] = zero;
+                px[x+2] = zero;
+            }else{
+                len = 1 / len;
+                px[x] *= len;
+                px[x+1] *= len;
+                px[x+2] *= len;
+            }
+        }
+    };
+    proto.kmeans = function(k,iter){
+        console.log('kmeans');
+        if(!k || k < 2){
+            k = 2;
+        }
+        iter = iter || 1;
+        var means = [];
+        for(i = 0; i < k; i++){
+            means.push({val:[i/(k-1),i/(k-1),i/(k-1)],cluster:[]});
+            //means.push({val:[Math.random(),Math.random(),Math.random()],cluster:[]});
+            console.log('mean:',i,means[i].val);
+        }
+        var pxcount = this.width * this.height;
+        var px = this.data;
+        var dists = [];
+        while(iter > 0){
+            console.log('iter:',iter);
+            for(var m = 0; m < k; m++){
+                means[m].cluster = [];
+            }
+            console.log('gathering...');
+            for(var x = 0; x < pxcount; x++){
+                for(var m = 0; m < k; m++){
+                    var col = means[m].val;
+                    dists[m] = Math.sqrt( Math.pow(px[x*3]   - col[0],2) +
+                                          Math.pow(px[x*3+1] - col[1],2) + 
+                                          Math.pow(px[x*3+2] - col[2],2)   );
+                }
+                var min = 0;
+                var mindist = dists[min];
+                for(var m = min+1; m < k; m++){
+                    if(dists[m] < mindist){
+                        mindist = dists[m];
+                        min = m;
+                    }
+                }
+                means[min].cluster.push(x*3);
+            }
+            console.log('centering...');
+            for(var m = 0; m < k; m++){
+                var cluster = means[m].cluster;
+                var clen = cluster.length;
+                console.log('clen:',clen);
+                var mean = [0,0,0];
+                for(var c = 0; c < clen; c++){
+                    mean[0] += px[cluster[c]];
+                    mean[1] += px[cluster[c]+1];
+                    mean[2] += px[cluster[c]+2];
+                }
+                means[m].val[0] = mean[0] / clen;
+                means[m].val[1] = mean[1] / clen;
+                means[m].val[2] = mean[2] / clen;
+            }
+            iter = iter - 1;
+        }
+        console.log('painting...');
+        for(var m = 0; m < k; m++){
+            console.log('mean:',i,means[m].val);
+            var cluster = means[m].cluster;
+            var col = means[m].val;
+            var clen = cluster.length;
+            for(var c = 0; c < clen; c++){
+                px[cluster[c]]   = col[0];
+                px[cluster[c]+1] = col[1];
+                px[cluster[c]+2] = col[2];
+            }
+        }
+    };
+    proto.samplenoise = function(sample,maxsample,buffer,variance){
+    };
+    proto.sample = function(sample,buffer,variance,maxsample){
+        variance = typeof variance === 'undefined' ? 1 : variance;
+        maxsample = maxsample || sample;
+        function gather(value){
+            if(value > 0.001){
+                return (Math.random() - 0.5)*(1-sample/maxsample) + value;
+            }else{
+                return value;
+            }
+        }
+        
+        if(sample <= 1){
+            for(var i = 0; i < this.datalen; i++){
+                this.data[i] = gather(buffer.data[i]); //(Math.random() - 0.5) + buffer.data[i]; //gather(buffer.data[i]);
+            }
+        }else{
+            var fac = 1.0/sample;
+            var cfac = (sample - 1) / sample;
+            console.log(sample,fac,cfac);
+            for(var i = 0; i < this.datalen; i++){
+                this.data[i] = this.data[i] * cfac + gather(buffer.data[i]) * fac;
+            }
+        }
+    };
+    proto.trace = function(buffer,samplecount, canvasSelector,sampleSelector){
+        var self = this;
+        if(this.traceInterval){
+            clearInterval(this.traceInterval);
+        }
+        this.traceCurrentSample = 1;
+        this.traceInterval = setInterval(function(){
+            console.log('tracing sample:',self.traceCurrentSample);
+            self.sample(self.traceCurrentSample,buffer,0.5,samplecount);
+            if(sampleSelector){
+                console.log('yup',sampleSelector,$(sampleSelector));
+                $(sampleSelector).html('sample: ' + self.traceCurrentSample);
+            }
+            self.traceCurrentSample += 1;
+            if(canvasSelector){
+                self.renderToCanvas(canvasSelector);
+            }
+            if(self.traceCurrentSample >= samplecount){
+                clearInterval(self.traceInterval);
+            }
+        },1/4.0);
+    };
+
     proto.mult = function(val){
         if(typeof val === 'number'){
             for(var i = 0; i < this.pxcount; i++){
@@ -231,6 +393,11 @@ window.onload = function(){
             for(var i = 0; i < this.pxcount; i++){
                 this.data[i] = val;
             }
+        }
+    };
+    proto.setScaled = function(buffer,scale){
+        for(var i = 0; i < this.pxcount; i++){
+            this.data[i] = buffer.data[i] * scale;
         }
     };
     proto.renderToCanvas = function(selector){
@@ -290,6 +457,7 @@ window.onload = function(){
     var g = new Buffer({width:800,height:600,imgsrc:'img/GREEN.png'});
     var tmp = new Buffer({width:800,height:600});
     var d = new Buffer({width:800,height:600});
+    var dtr = new Buffer({width:800,height:600});
     window.slide = function(fac){
         var fr = 0, fg = 0, fb = 0;
         if(fac < 1.0/6.0){
@@ -316,6 +484,7 @@ window.onload = function(){
         fg *= norm;
         fb *= norm;
 
+        /*
         tmp.set(r);
         tmp.mult(fr);
         d.set(tmp);
@@ -324,13 +493,42 @@ window.onload = function(){
         d.add(tmp);
         tmp.set(b);
         tmp.mult(fb);
-        d.add(tmp);
-        d.renderToCanvas('canvas.blend');
+        */
+        d.setScaled(r,fr);
+        d.addScaled(g,fg);
+        d.addScaled(b,fb);
+        //d.renderToCanvas('canvas.blend');
+        dtr.trace(d,100,'canvas.blend','.view.blending .sample');
     }
 
-    window.slider = new Slider({label:'hue',hardmin:true, hardmax:true, linear:true, set_value:slide});
+    window.slider = new Slider({label:'hue',hardmin:true, hardmax:true, linear:true, looping:true, set_value:slide});
     slider.append('.view.blending .controls');
     setTimeout(function(){slider.setValue(0.5);},1000);
+
+    var normalizeFac = 0.5;
+    var normalizeA = new Buffer({width:800,height:600,imgsrc:'img/a.jpg'});
+    //var normalizeA = new Buffer({width:800,height:600,imgsrc:'img/LIGHTINGCEILING.png'});
+    var normalizeB = null;
+    var normalizeDst = new Buffer({width:800, height:600});
+    var normalizeTmp = new Buffer({width:800, height:600});
+
+    function renderNormalize(){
+        if(!normalizeB){
+            normalizeB = new Buffer({width:800, height: 600});
+            normalizeB.set(normalizeA);
+            normalizeB.kmeans(5,10);
+        }
+        normalizeDst.setScaled(normalizeA,1-normalizeFac);
+        normalizeDst.addScaled(normalizeB,normalizeFac);
+        normalizeDst.renderToCanvas('.view.normalize canvas');
+    }
+
+    (new Slider({label:'Normalize',hardmin:true, hardmax:true, linear:true, value:normalizeFac, set_value:function(val){
+        normalizeFac = val;
+        renderNormalize();
+    }})).append('.view.normalize .controls');
+
+    setTimeout(function(){renderNormalize();},1000);
 
     var ceil = new Buffer({width:800,height:600,imgsrc:'img/LIGHTINGCEILING.png'});
     var balls = new Buffer({width:800,height:600,imgsrc:'img/LIGHTINGBALLSDIM.png'});

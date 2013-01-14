@@ -1,4 +1,5 @@
 window.onload = function(){
+  	/* hello world from prose.io */
     window.slider_template = 
         "<span class='slider'> \
             <span class='preset'></span>\

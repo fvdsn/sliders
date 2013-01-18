@@ -36,17 +36,14 @@ window.onload = function(){
         this.step = 0.05;
         this.minstep = 0.05;
         this.value = 0.75;
+        this.ghostValue = 0.75;
         this.increment = 0.1;
         
 
         this.showProgress = true;
         this.showIncrement = true;
 
-        this.presets = {
-            'min':this.min,
-            'middle': (this.min+this.max)/2.0,
-            'max':this.max,
-        }
+        this.presets = null;
         this.sortedPresets = null;
 
         for(field in this){
@@ -54,6 +51,13 @@ window.onload = function(){
                 this[field] = opt[field];
             }
         }
+        this.presets = this.presets || {
+            'min': this.min,
+            'middle': (this.min+this.max)/2.0,
+            'max':this.max,
+        };
+        this.sortPresets();
+
         this.$el.find('.left.arrow').click(function(){ self.decrease(); });
         this.$el.find('.right.arrow').click(function(){ self.increase(); });
         self.lastX = 0;
@@ -63,16 +67,26 @@ window.onload = function(){
         });
         this.$el.find('.slide').bind('dragend',function(ev,drag){
             self.setBounds();
-            self.$el.find('.preset').hide(250);
+            self.$el.find('.preset').removeClass('show');
         });
         this.$el.find('.slide').bind('drag',function(ev,drag){ 
             var dx = drag.deltaX - self.lastX;
             self.lastX = drag.deltaX;
-            self.setValue( self.slide(self.startValue, self.value, dx, drag.deltaX, {precise:ev.shiftKey, step:ev.ctrlKey}));
             if(ev.altKey){
-                self.$el.find('.preset').show();
+                self.$el.find('.preset').addClass('show');
+                self.ghostValue = self.slide(self.startValue, self.ghostValue, dx, drag.deltaX, {precise:ev.shiftKey, step:ev.ctrlKey});
+                var preset = self.nearestPreset(self.ghostValue);
+                if(preset){
+                    self.$el.find('.preset').html(preset.name+' : '+preset.value);
+                    if(self.value !== preset.value){
+                        self.setValue(preset.value);
+                    }
+                }else{
+                    self.setValue(self.ghostValue);
+                }
             }else{
-                self.$el.find('.preset').hide(250);
+                self.setValue( self.slide(self.startValue, self.value, dx, drag.deltaX, {precise:ev.shiftKey, step:ev.ctrlKey}));
+                self.$el.find('.preset').removeClass('show');
             }
         });
         if(!this.showProgress){
@@ -81,7 +95,6 @@ window.onload = function(){
         if(!this.showIncrement){
             this.$el.find('.arrow').remove();
         }
-        this.$el.find('.preset').hide();
 
         this.render();
     };
@@ -91,11 +104,23 @@ window.onload = function(){
     proto.sortPresets = function(){
         this.sortedPresets = [];
         for(preset in this.presets){
-            this.sortedPresets.append(preset);
+            this.sortedPresets.push({name:preset, value: this.presets[preset]});
         }
         this.sortedPresets.sort(function(a,b){ return a.value - b.value; });
+        console.log(this.sortedPresets);
     }
     proto.nearestPreset = function(value){
+        // not very efficient but who cares ? not me !
+        var presets = this.sortedPresets;
+        if(presets.length <= 1 || value <= presets[0].value){
+            return presets[0];
+        }
+        for(var i = 0, len = presets.length; i < len -1; i++){
+            if( value - presets[i].value < presets[i+1].value - value){
+                return presets[i];
+            }
+        }
+        return presets[presets.length -1];
     }
     function powround(value,base){
         base = typeof base === 'undefined' ? 10 : base;
@@ -178,6 +203,7 @@ window.onload = function(){
         }
 
         this.value = val;
+        this.ghostValue = val;
         if(this.set_value){
             this.set_value(val);
         }
@@ -327,7 +353,7 @@ window.onload = function(){
     proto.sample = function(sample,buffer,variance,maxsample){
         variance = typeof variance === 'undefined' ? 1 : variance;
         maxsample = maxsample || sample;
-        var fac = Math.min(1,1/Math.sqrt(sample*0.3));
+        var fac = Math.min(2,1/Math.sqrt(sample*0.1));
         function gather(value){
             if(value > 0.001){
                 return (Math.random() - 0.5)*fac + value;
@@ -499,7 +525,7 @@ window.onload = function(){
         d.addScaled(g,fg);
         d.addScaled(b,fb);
         //d.renderToCanvas('canvas.blend');
-        dtr.trace(d,100,'canvas.blend','.view.blending .sample');
+        dtr.trace(d,10,'canvas.blend','.view.blending .sample');
     }
 
     window.slider = new Slider({label:'hue',hardmin:true, hardmax:true, linear:true, looping:true, set_value:slide});
@@ -524,9 +550,13 @@ window.onload = function(){
         normalizeDst.renderToCanvas('.view.normalize canvas');
     }
 
-    (new Slider({label:'Normalize',hardmin:true, hardmax:true, linear:true, value:normalizeFac, set_value:function(val){
-        normalizeFac = val;
-        renderNormalize();
+    (new Slider({label:'Normalize',hardmin:true, hardmax:true, linear:true, value:normalizeFac, 
+        presets:{
+            'Realistic':0, 'Subtle':0.25, 'Middle':0.5, 'Blended':0.75, 'Cartoon':1.0
+        },
+        set_value:function(val){
+            normalizeFac = val;
+            renderNormalize();
     }})).append('.view.normalize .controls');
 
     setTimeout(function(){renderNormalize();},1000);
